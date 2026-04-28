@@ -1,0 +1,139 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from database import get_db
+from models.models import Trip, Passenger
+from schemas import trips
+from services.matching import find_nearest_driver
+from services.ws_manager import manager
+import logging
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/trips", tags=["Trip"])
+
+
+@router.post("/", response_model=trips.TripRead)
+async def create_trip(trip_data: trips.TripCreate, db: Session = Depends(get_db)):
+    """Create a new trip request and assign to nearest available driver."""
+    try:
+        # Validate coordinates
+        if not (-90 <= trip_data.pickup_lat <= 90 and -180 <= trip_data.pickup_lng <= 180):
+            logger.warning(f"Invalid pickup coordinates: lat={trip_data.pickup_lat}, lng={trip_data.pickup_lng}")
+            raise HTTPException(status_code=400, detail="Invalid pickup coordinates")
+        
+        if not (-90 <= trip_data.dest_lat <= 90 and -180 <= trip_data.dest_lng <= 180):
+            logger.warning(f"Invalid destination coordinates: lat={trip_data.dest_lat}, lng={trip_data.dest_lng}")
+            raise HTTPException(status_code=400, detail="Invalid destination coordinates")
+        
+        # Verify passenger exists
+        passenger = db.query(Passenger).filter(Passenger.id == trip_data.passenger_id).first()
+        if not passenger:
+            logger.warning(f"Trip creation attempt with non-existent passenger: {trip_data.passenger_id}")
+            raise HTTPException(status_code=404, detail="Passenger not found")
+        
+        # Find nearest driver if not specified
+        driver_id = trip_data.driver_id
+        if driver_id is None:
+            driver_id = find_nearest_driver(db, trip_data.pickup_lat, trip_data.pickup_lng)
+        
+        if driver_id is None:
+            logger.warning(f"No drivers available for trip at ({trip_data.pickup_lat}, {trip_data.pickup_lng})")
+            raise HTTPException(status_code=503, detail="No drivers available at this location")
+        
+        # Create trip
+        new_trip = Trip(
+            passenger_id=trip_data.passenger_id,
+            driver_id=driver_id,
+            pickup_lat=trip_data.pickup_lat,
+            pickup_lng=trip_data.pickup_lng,
+            dest_lat=trip_data.dest_lat,
+            dest_lng=trip_data.dest_lng,
+            fare_estimate=trip_data.fare_estimate,
+            status="requested"
+        )
+        db.add(new_trip)
+        db.commit()
+        db.refresh(new_trip)
+        
+        # Notify driver about new trip
+        if driver_id:
+            try:
+                sent = await manager.send(driver_id, {
+                    "type": "new_trip",
+                    "trip_id": new_trip.id,
+                    "passenger_id": trip_data.passenger_id,
+                    "pickup": {"lat": trip_data.pickup_lat, "lng": trip_data.pickup_lng},
+                    "destination": {"lat": trip_data.dest_lat, "lng": trip_data.dest_lng},
+                    "fare_estimate": str(trip_data.fare_estimate) if trip_data.fare_estimate else None
+                })
+                logger.debug(f"Trip {new_trip.id} notification sent to {sent} client(s)")
+            except Exception as e:
+                logger.error(f"Failed to notify driver about trip {new_trip.id}: {e}")
+                # Don't fail the trip creation if notification fails
+        
+        logger.info(f"Trip created successfully: {new_trip.id}")
+        return new_trip
+    
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error during trip creation: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error during trip creation: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
+@router.get("/{trip_id}", response_model=trips.TripRead)
+def get_trip(trip_id: int, db: Session = Depends(get_db)):
+    """Retrieve trip information by ID."""
+    try:
+        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if not trip:
+            logger.info(f"Trip not found: {trip_id}")
+            raise HTTPException(status_code=404, detail="Trip not found")
+        return trip
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error retrieving trip {trip_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving trip {trip_id}: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+
+@router.put("/{trip_id}", response_model=trips.TripRead)
+def update_trip(trip_id: int, trip_data: trips.TripUpdate, db: Session = Depends(get_db)):
+    """Update trip status and fare information."""
+    try:
+        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if not trip:
+            logger.info(f"Trip not found for update: {trip_id}")
+            raise HTTPException(status_code=404, detail="Trip not found")
+        
+        # Update fields
+        update_data = trip_data.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            if hasattr(trip, key):
+                setattr(trip, key, value)
+        
+        db.add(trip)
+        db.commit()
+        db.refresh(trip)
+        
+        logger.info(f"Trip {trip_id} updated successfully")
+        return trip
+    
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error updating trip {trip_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error updating trip {trip_id}: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
