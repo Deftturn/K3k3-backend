@@ -7,9 +7,22 @@ from schemas import trips
 from services.matching import find_nearest_driver
 from services.ws_manager import manager
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trips", tags=["Trip"])
+
+@router.get("/", response_model=List[trips.TripRead])
+def get_trips(db:Session = Depends(get_db)):
+    """Retrieve Trips"""
+    try:
+        return db.query(Trip).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error retrieving trips: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving trips: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @router.post("/", response_model=trips.TripRead)

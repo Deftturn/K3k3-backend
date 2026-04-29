@@ -7,6 +7,7 @@ from schemas import driver
 from services.location import update_driver_location
 from services.ws_manager import manager
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/drivers", tags=['Driver'])
@@ -47,6 +48,18 @@ def create_driver(driver_data: driver.DriverCreate, db: Session = Depends(get_db
         logger.error(f"Unexpected error during driver registration: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
+@router.get("/", response_model=List[driver.DriverRead])
+def get_drivers(db:Session = Depends(get_db)):
+    """Retrieve Drivers"""
+    try:
+        return db.query(Driver).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error retrieving drivers: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving drivers: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
 
 @router.get("/{driver_id}", response_model=driver.DriverRead)
 def get_driver(driver_id: int, db: Session = Depends(get_db)):
@@ -84,7 +97,7 @@ async def update_location(driver_id: int, lat: float, lng: float, db: Session = 
         
         # Update location in database
         location_str = f"{lat},{lng}"
-        driver_obj.location = location_str
+        driver_obj.location = location_str #type: ignore
         db.add(driver_obj)
         db.commit()
         db.refresh(driver_obj)
@@ -126,7 +139,7 @@ def update_availability(driver_id: int, is_available: bool, db: Session = Depend
             logger.info(f"Driver not found for availability update: {driver_id}")
             raise HTTPException(status_code=404, detail="Driver not found")
         
-        driver_obj.is_available = is_available
+        driver_obj.is_available = is_available #type: ignore
         db.add(driver_obj)
         db.commit()
         db.refresh(driver_obj)

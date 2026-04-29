@@ -6,9 +6,22 @@ from models.models import User, Role
 from schemas import user
 from utils.hashcode import hash_password, verify_password
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
+
+@router.get("/", response_model=List[user.UserRead])
+def get_users(db:Session = Depends(get_db)):
+    """Retrieve Users"""
+    try:
+        return db.query(User).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error retrieving users: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving users: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @router.post("/register/", response_model=user.UserRead)

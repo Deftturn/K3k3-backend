@@ -1,14 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException
+
 from database import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from models.models import Passenger, User, Role
+from models.models import Driver, Passenger, User, Role
 from schemas import passanger
 from utils.hashcode import hash_password
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/passengers", tags=["passengers"])
+
+@router.get("/", response_model=List[passanger.PassengerRead])
+def get_passengers(db:Session = Depends(get_db)):
+    """Retrieve Passengers"""
+    try:
+        return db.query(Passenger).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error retrieving passengers: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving passengers: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
 @router.post("/register/", response_model=passanger.PassengerRead)

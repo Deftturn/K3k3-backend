@@ -25,4 +25,4 @@ DATABASE : `DB_URL="sqlite:///database.db"` in .env file, the `database.py` file
 * Go into the backend directory by calling `cd backend`
 * Run `python3 main.py` or `python main.py`
 * In the terminal, find `Uvicorn running on http://localhost:8810 (Press CTRL+C to quit)` and click on link
-* In the address bar `http://http://localhost:8810` + `/docs` to see interactive SwaggerUI
+* In the address bar `http://localhost:8810` + `/docs` to see interactive SwaggerUI

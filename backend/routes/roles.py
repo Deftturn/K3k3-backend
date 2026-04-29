@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models.models import Role, User
 from schemas import role
 import logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/roles", tags=["roles"])
@@ -42,6 +43,18 @@ def create_role(role_data: role.RoleCreate, user_id: int, db: Session = Depends(
     except Exception as e:
         db.rollback()
         logger.error(f"Unexpected error during role creation: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+@router.get("/", response_model=List[role.RoleRead])
+def get_roles(db:Session = Depends(get_db)):
+    """Retrieve Roles"""
+    try:
+        return db.query(Role).all()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error retrieving roles: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving roles: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
