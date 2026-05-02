@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import connect
-from routes import users, admin, roles, drivers, trips, ws_routes, passanger
+from routes import users, admin, drivers, trips, ws_routes, passanger, vehicles
 import logging_config  # Initialize logging
 
 logger = logging_config.logger
@@ -23,11 +23,11 @@ app = FastAPI(
 # Register all route routers
 app.include_router(users.router)
 app.include_router(admin.router)
-app.include_router(roles.router)
 app.include_router(drivers.router)
 app.include_router(trips.router)
 app.include_router(passanger.router)
 app.include_router(ws_routes.router)
+app.include_router(vehicles.router)
 
 logger.info("All routes registered successfully")
 

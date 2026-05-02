@@ -1,8 +1,8 @@
-from . import driver, trips, user, passanger
+from . import rider, trips, user, passanger
 from typing import Optional
 from vehicle import VehicleRead
 
-class DriverDetailRead(driver.DriverRead):
+class DriverDetailRead(rider.DriverRead):
     """Driver with their vehicle attached."""
     vehicle: Optional[VehicleRead] = None
 

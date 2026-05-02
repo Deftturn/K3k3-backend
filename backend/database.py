@@ -8,7 +8,7 @@ load_dotenv()
 class Base(DeclarativeBase):
     pass
 
-DB = os.getenv("DB_URL") or ""
+DB = os.getenv("SUPABASE_DB") or ""
 engine = create_engine(DB)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

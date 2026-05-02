@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from models.models import Driver, Passenger, User, Role
+from models.models import Passenger, User
 from schemas import passanger
 from utils.hashcode import hash_password
 import logging
@@ -52,22 +52,14 @@ def create_passenger(passenger_data: passanger.PassengerCreate, db: Session = De
         db.commit()
         db.refresh(new_user)
         
-        # Create role for the passenger
-        try:
-            new_role = Role(user_id=new_user.id, role_type="passenger")
-            db.add(new_role)
-            db.commit()
-            db.refresh(new_role)
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to create passenger role for user {new_user.id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to create passenger role")
+      
         
         # Create passenger entry
         try:
             new_passenger = Passenger(
-                role_id=new_role.id,
-                location=passenger_data.location,
+                user_id=new_user.id,
+                current_lat=passenger_data.current_lat,
+                current_lng=passenger_data.current_lng,
                 gender=str(passenger_data.gender).lower()
             )
             db.add(new_passenger)
@@ -75,7 +67,7 @@ def create_passenger(passenger_data: passanger.PassengerCreate, db: Session = De
             db.refresh(new_passenger)
         except Exception as e:
             db.rollback()
-            logger.error(f"Failed to create passenger entry for role {new_role.id}: {e}")
+            logger.error(f"Failed to create passenger entry for user {new_user.id}: {e}")
             raise HTTPException(status_code=500, detail="Failed to create passenger entry")
         
         logger.info(f"Passenger registered successfully: {passenger_data.email}")
@@ -148,3 +140,31 @@ def update_passenger(passenger_id: int, passenger_data: passanger.PassengerUpdat
         logger.error(f"Unexpected error updating passenger {passenger_id}: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
+# --------------------------------------------
+# Delete passenger endpoint
+# --------------------------------------------
+@router.delete("/{passenger_id}")
+def delete_passenger(passenger_id: int, db: Session = Depends(get_db)): 
+    """Delete a passenger by ID."""
+    try:
+        passenger = db.query(Passenger).filter(Passenger.id == passenger_id).first()
+        if not passenger:
+            logger.info(f"Passenger not found for deletion: {passenger_id}")
+            raise HTTPException(status_code=404, detail="Passenger not found")
+        
+        db.delete(passenger)
+        db.commit()
+        
+        logger.info(f"Passenger {passenger_id} deleted successfully")
+        return {"detail": "Passenger deleted successfully"}
+    
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error deleting passenger {passenger_id}: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error deleting passenger {passenger_id}: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")

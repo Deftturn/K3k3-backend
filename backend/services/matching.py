@@ -5,9 +5,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def find_nearest_driver(db: Session, lat: float, lng: float) -> int | None:
+def find_nearest_rider(db: Session, lat: float, lng: float) -> int | None:
     """
-    Find the nearest available driver to the given coordinates.
+    Find the nearest available rider to the given coordinates.
     
     Args:
         db: Database session
@@ -15,7 +15,7 @@ def find_nearest_driver(db: Session, lat: float, lng: float) -> int | None:
         lng: Longitude (-180 to 180)
     
     Returns:
-        Driver ID if found, None otherwise
+        Rider ID if found, None otherwise
     """
     try:
         # Validate coordinates
@@ -26,9 +26,9 @@ def find_nearest_driver(db: Session, lat: float, lng: float) -> int | None:
             logger.error(f"Invalid longitude: {lng}")
             return None
         
-        # Query for nearest available driver
+        # Query for nearest available rider
         query = text("""
-            SELECT id FROM drivers 
+            SELECT id FROM riders 
             WHERE is_available = true 
             ORDER BY location <-> ST_SetSRID(ST_MakePoint(:lng, :lat), 4326) 
             LIMIT 1

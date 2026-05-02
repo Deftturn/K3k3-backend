@@ -2,119 +2,119 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from database import get_db
-from models.models import Driver, Role
-from schemas import driver
+from models.models import Rider,User
+from schemas import rider
 from services.location import update_driver_location
 from services.ws_manager import manager
 import logging
 from typing import List
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/drivers", tags=['Driver'])
+router = APIRouter(prefix="/riders", tags=['Riders'])
 
 
-@router.post("/register/", response_model=driver.DriverRead)
-def create_driver(driver_data: driver.DriverCreate, db: Session = Depends(get_db)):
-    """Register a new driver with a role."""
+@router.post("/register/", response_model=rider.RiderRead)
+def create_rider(rider_data: rider.RiderCreate, db: Session = Depends(get_db)):
+    """Register a new rider with a role."""
     try:
-        # Check if role exists
-        role = db.query(Role).filter(Role.id == driver_data.role_id).first()
-        if not role:
-            logger.warning(f"Driver registration attempt with non-existent role: {driver_data.role_id}")
-            raise HTTPException(status_code=404, detail="Role not found")
+        # Check if user exists
+        user = db.query(User).filter(User.id == rider_data.user_id).first()
+        if not user:
+            logger.warning(f"Rider registration attempt with non-existent user: {rider_data.user_id}")
+            raise HTTPException(status_code=404, detail="User not found")
         
-        # Create driver
-        new_driver = Driver(
-            role_id=driver_data.role_id,
-            rating=driver_data.rating,
-            is_available=driver_data.is_available,
-            location=driver_data.location
+        # Create rider
+        new_rider = Rider(
+            user_id=rider_data.user_id,
+            rating=rider_data.rating,
+            is_available=rider_data.is_available,
+            location=rider_data.location
         )
-        db.add(new_driver)
+        db.add(new_rider)
         db.commit()
-        db.refresh(new_driver)
+        db.refresh(new_rider)
         
-        logger.info(f"Driver registered successfully with role {driver_data.role_id}")
-        return new_driver
+        logger.info(f"Rider registered successfully with user {rider_data.user_id}")
+        return new_rider   
     
     except HTTPException:
         raise
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Database error during driver registration: {e}")
+        logger.error(f"Database error during rider registration: {e}")
         raise HTTPException(status_code=500, detail="Database error occurred")
     except Exception as e:
         db.rollback()
-        logger.error(f"Unexpected error during driver registration: {e}")
+        logger.error(f"Unexpected error during rider registration: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
-@router.get("/", response_model=List[driver.DriverRead])
-def get_drivers(db:Session = Depends(get_db)):
-    """Retrieve Drivers"""
+@router.get("/", response_model=List[rider.RiderRead])
+def get_riders(db:Session = Depends(get_db)):
+    """Retrieve Riders"""
     try:
-        return db.query(Driver).all()
+        return db.query(Rider).all()
     except SQLAlchemyError as e:
-        logger.error(f"Database error retrieving drivers: {e}")
+        logger.error(f"Database error retrieving riders: {e}")
         raise HTTPException(status_code=500, detail="Database error occurred")
     except Exception as e:
-        logger.error(f"Unexpected error retrieving drivers: {e}")
+        logger.error(f"Unexpected error retrieving riders: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
-@router.get("/{driver_id}", response_model=driver.DriverRead)
-def get_driver(driver_id: int, db: Session = Depends(get_db)):
-    """Retrieve driver information by ID."""
+@router.get("/{rider_id}", response_model=rider.RiderRead)
+def get_rider(rider_id: int, db: Session = Depends(get_db)):
+    """Retrieve rider information by ID."""
     try:
-        driver_obj = db.query(Driver).filter(Driver.id == driver_id).first()
-        if not driver_obj:
-            logger.info(f"Driver not found: {driver_id}")
-            raise HTTPException(status_code=404, detail="Driver not found")
-        return driver_obj
+        rider_obj = db.query(Rider).filter(Rider.id == rider_id).first()
+        if not rider_obj:
+            logger.info(f"Rider not found: {rider_id}")
+            raise HTTPException(status_code=404, detail="Rider not found")
+        return rider_obj
     except HTTPException:
         raise
     except SQLAlchemyError as e:
-        logger.error(f"Database error retrieving driver {driver_id}: {e}")
+        logger.error(f"Database error retrieving rider {rider_id}: {e}")
         raise HTTPException(status_code=500, detail="Database error occurred")
     except Exception as e:
-        logger.error(f"Unexpected error retrieving driver {driver_id}: {e}")
+        logger.error(f"Unexpected error retrieving rider {rider_id}: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
-@router.put("/{driver_id}/location")
-async def update_location(driver_id: int, lat: float, lng: float, db: Session = Depends(get_db)):
-    """Update driver location and notify connected clients."""
+@router.put("/{rider_id}/location")
+async def update_location(rider_id: int, lat: float, lng: float, db: Session = Depends(get_db)):
+    """Update rider location and notify connected clients."""
     try:
         # Validate coordinates
         if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-            logger.warning(f"Invalid coordinates provided for driver {driver_id}: lat={lat}, lng={lng}")
+            logger.warning(f"Invalid coordinates provided for rider {rider_id}: lat={lat}, lng={lng}")
             raise HTTPException(status_code=400, detail="Invalid coordinates: latitude must be -90 to 90, longitude must be -180 to 180")
         
-        # Get driver
-        driver_obj = db.query(Driver).filter(Driver.id == driver_id).first()
-        if not driver_obj:
-            logger.info(f"Driver not found for location update: {driver_id}")
-            raise HTTPException(status_code=404, detail="Driver not found")
+        # Get rider
+        rider_obj = db.query(Rider).filter(Rider.id == rider_id).first()
+        if not rider_obj:
+            logger.info(f"Rider not found for location update: {rider_id}")
+            raise HTTPException(status_code=404, detail="Rider not found")
         
         # Update location in database
         location_str = f"{lat},{lng}"
-        driver_obj.location = location_str #type: ignore
-        db.add(driver_obj)
+        rider_obj.location = location_str #type: ignore
+        db.add(rider_obj)
         db.commit()
-        db.refresh(driver_obj)
+        db.refresh(rider_obj)
         
         # Update Redis cache
-        success = update_driver_location(driver_id, lat, lng)
+        success = update_driver_location(rider_id, lat, lng)
         if not success:
-            logger.warning(f"Failed to update driver {driver_id} location in Redis")
+            logger.warning(f"Failed to update rider {rider_id} location in Redis")
         
         # Notify connected clients
-        sent = await manager.send(driver_id, {
+        sent = await manager.send(rider_id, {
             "type": "location_update",
-            "driver_id": driver_id,
+            "rider_id": rider_id,
             "lat": lat,
             "lng": lng
         })
-        logger.debug(f"Location update sent to {sent} client(s) for driver {driver_id}")
+        logger.debug(f"Location update sent to {sent} client(s) for rider {rider_id}")
         
         return {"status": "updated", "clients_notified": sent}
     
@@ -122,38 +122,67 @@ async def update_location(driver_id: int, lat: float, lng: float, db: Session = 
         raise
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Database error updating location for driver {driver_id}: {e}")
+        logger.error(f"Database error updating location for rider {rider_id}: {e}")
         raise HTTPException(status_code=500, detail="Database error occurred")
     except Exception as e:
         db.rollback()
-        logger.error(f"Unexpected error updating location for driver {driver_id}: {e}")
+        logger.error(f"Unexpected error updating location for rider {rider_id}: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
-@router.put("/{driver_id}/availability")
-def update_availability(driver_id: int, is_available: bool, db: Session = Depends(get_db)):
-    """Update driver availability status."""
+@router.put("/{rider_id}/availability")
+def update_availability(rider_id: int, is_available: bool, db: Session = Depends(get_db)):
+    """Update rider availability status."""
     try:
-        driver_obj = db.query(Driver).filter(Driver.id == driver_id).first()
-        if not driver_obj:
-            logger.info(f"Driver not found for availability update: {driver_id}")
-            raise HTTPException(status_code=404, detail="Driver not found")
+        rider_obj = db.query(Rider).filter(Rider.id == rider_id).first()
+        if not rider_obj:
+            logger.info(f"Rider not found for availability update: {rider_id}")
+            raise HTTPException(status_code=404, detail="Rider not found")
         
-        driver_obj.is_available = is_available #type: ignore
-        db.add(driver_obj)
+        rider_obj.is_available = is_available #type: ignore
+        db.add(rider_obj)
         db.commit()
-        db.refresh(driver_obj)
+        db.refresh(rider_obj)
         
-        logger.info(f"Driver {driver_id} availability set to {is_available}")
+        logger.info(f"Rider {rider_id} availability set to {is_available}")
         return {"status": "updated", "is_available": is_available}
     
     except HTTPException:
         raise
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Database error updating availability for driver {driver_id}: {e}")
+        logger.error(f"Database error updating availability for rider {rider_id}: {e}")
         raise HTTPException(status_code=500, detail="Database error occurred")
     except Exception as e:
         db.rollback()
-        logger.error(f"Unexpected error updating availability for driver {driver_id}: {e}")
+        logger.error(f"Unexpected error updating availability for rider {rider_id}: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+# --------------------------------------------
+# Delete rider endpoint
+# --------------------------------------------
+@router.delete("/{rider_id}")
+def delete_rider(rider_id: int, db: Session = Depends(get_db)): 
+    """Delete a rider by ID."""
+    try:
+        rider_obj = db.query(Rider).filter(Rider.id == rider_id).first()
+        if not rider_obj:
+            logger.info(f"Rider not found for deletion: {rider_id}")
+            raise HTTPException(status_code=404, detail="Rider not found")
+        
+        db.delete(rider_obj)
+        db.commit()
+        
+        logger.info(f"Rider deleted successfully: {rider_id}")
+        return {"detail": "Rider deleted successfully"}
+    
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error during rider deletion: {e}")
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Unexpected error during rider deletion: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")

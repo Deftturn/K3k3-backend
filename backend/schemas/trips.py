@@ -15,18 +15,18 @@ class TripBase(ORMBase):
 
 class TripCreate(TripBase):
     passenger_id: int
-    driver_id: Optional[int] = None   # assigned later by matching logic
+    rider_id: Optional[int] = None   # assigned later by matching logic
 
 
 class TripUpdate(ORMBase):
-    driver_id: Optional[int] = None
+    rider_id: Optional[int] = None
     status: Optional[str] = None
     actual_fare: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
 
 
 class TripRead(TripBase):
     id: int
-    driver_id: Optional[int]
+    rider_id: Optional[int]
     passenger_id: int
     status: str
     actual_fare: Optional[Decimal]

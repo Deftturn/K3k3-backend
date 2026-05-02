@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from database import get_db
 from models.models import Trip, Passenger
 from schemas import trips
-from services.matching import find_nearest_driver
+from services.matching import find_nearest_rider
 from services.ws_manager import manager
 import logging
 from typing import List
@@ -27,7 +27,7 @@ def get_trips(db:Session = Depends(get_db)):
 
 @router.post("/", response_model=trips.TripRead)
 async def create_trip(trip_data: trips.TripCreate, db: Session = Depends(get_db)):
-    """Create a new trip request and assign to nearest available driver."""
+    """Create a new trip request and assign to nearest available rider."""
     try:
         # Validate coordinates
         if not (-90 <= trip_data.pickup_lat <= 90 and -180 <= trip_data.pickup_lng <= 180):
@@ -44,19 +44,19 @@ async def create_trip(trip_data: trips.TripCreate, db: Session = Depends(get_db)
             logger.warning(f"Trip creation attempt with non-existent passenger: {trip_data.passenger_id}")
             raise HTTPException(status_code=404, detail="Passenger not found")
         
-        # Find nearest driver if not specified
-        driver_id = trip_data.driver_id
-        if driver_id is None:
-            driver_id = find_nearest_driver(db, trip_data.pickup_lat, trip_data.pickup_lng)
+        # Find nearest rider if not specified
+        rider_id = trip_data.rider_id
+        if rider_id is None:
+            rider_id = find_nearest_rider(db, trip_data.pickup_lat, trip_data.pickup_lng)
         
-        if driver_id is None:
-            logger.warning(f"No drivers available for trip at ({trip_data.pickup_lat}, {trip_data.pickup_lng})")
-            raise HTTPException(status_code=503, detail="No drivers available at this location")
+        if rider_id is None:
+            logger.warning(f"No riders available for trip at ({trip_data.pickup_lat}, {trip_data.pickup_lng})")
+            raise HTTPException(status_code=503, detail="No riders available at this location")
         
         # Create trip
         new_trip = Trip(
             passenger_id=trip_data.passenger_id,
-            driver_id=driver_id,
+            rider_id=rider_id,
             pickup_lat=trip_data.pickup_lat,
             pickup_lng=trip_data.pickup_lng,
             dest_lat=trip_data.dest_lat,
@@ -68,10 +68,10 @@ async def create_trip(trip_data: trips.TripCreate, db: Session = Depends(get_db)
         db.commit()
         db.refresh(new_trip)
         
-        # Notify driver about new trip
-        if driver_id:
+        # Notify rider about new trip
+        if rider_id:
             try:
-                sent = await manager.send(driver_id, {
+                sent = await manager.send(rider_id, {
                     "type": "new_trip",
                     "trip_id": new_trip.id,
                     "passenger_id": trip_data.passenger_id,
@@ -81,7 +81,7 @@ async def create_trip(trip_data: trips.TripCreate, db: Session = Depends(get_db)
                 })
                 logger.debug(f"Trip {new_trip.id} notification sent to {sent} client(s)")
             except Exception as e:
-                logger.error(f"Failed to notify driver about trip {new_trip.id}: {e}")
+                logger.error(f"Failed to notify rider about trip {new_trip.id}: {e}")
                 # Don't fail the trip creation if notification fails
         
         logger.info(f"Trip created successfully: {new_trip.id}")

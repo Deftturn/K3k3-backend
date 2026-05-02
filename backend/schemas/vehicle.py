@@ -14,7 +14,7 @@ class VehicleBase(ORMBase):
 
 
 class VehicleCreate(VehicleBase):
-    driver_id: int
+    rider_id: int
 
 
 class VehicleUpdate(ORMBase):
@@ -28,4 +28,4 @@ class VehicleUpdate(ORMBase):
 
 class VehicleRead(VehicleBase):
     id: int
-    driver_id: int
+    rider_id: int

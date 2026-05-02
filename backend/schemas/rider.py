@@ -3,23 +3,26 @@ from decimal import Decimal
 from typing import Optional
 from pydantic import Field
 
+#RIDER SCHEMAS / DRIVER SCHEMAS
 
-class DriverBase(ORMBase):
+
+class RiderBase(ORMBase):
     rating: Optional[Decimal] = Field(None, ge=0, le=5, decimal_places=2)
     is_available: bool = True
     location: Optional[str] = None
+    gender: Optional[str] = None
 
 
-class DriverCreate(DriverBase):
-    role_id: int
+class RiderCreate(RiderBase):
+    user_id: int
 
 
-class DriverUpdate(ORMBase):
+class RiderUpdate(ORMBase):
     rating: Optional[Decimal] = Field(None, ge=0, le=5, decimal_places=2)
     is_available: Optional[bool] = None
     location: Optional[str] = None
+    gender: Optional[str] = None
 
-
-class DriverRead(DriverBase):
+class RiderRead(RiderBase):
     id: int
-    role_id: int
+    user_id: int
