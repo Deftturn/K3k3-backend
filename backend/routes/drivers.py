@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from database import get_db
-from models.models import Rider,User
+from models.models import Rider, User, RiderApprovalStatus
 from schemas import rider
 from services.location import update_driver_location
 from services.ws_manager import manager
+from utils.id_generator import generate_id
 import logging
 from typing import List
 
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/riders", tags=['Riders'])
 
 @router.post("/register/", response_model=rider.RiderRead)
 def create_rider(rider_data: rider.RiderCreate, db: Session = Depends(get_db)):
-    """Register a new rider with a role."""
+    """Register a new rider. Status is set to pending and awaits admin approval."""
     try:
         # Check if user exists
         user = db.query(User).filter(User.id == rider_data.user_id).first()
@@ -23,18 +24,23 @@ def create_rider(rider_data: rider.RiderCreate, db: Session = Depends(get_db)):
             logger.warning(f"Rider registration attempt with non-existent user: {rider_data.user_id}")
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Create rider
+        # Generate unique IDs
+        rider_id = generate_id("K3R")
+        public_id = generate_id("K3R")
+        
+        # Create rider with pending approval status
         new_rider = Rider(
             user_id=rider_data.user_id,
-            rating=rider_data.rating,
+            rider_id=rider_id,
+            public_id=public_id,
+            approval_status=RiderApprovalStatus.pending,
             is_available=rider_data.is_available,
-            location=rider_data.location
         )
         db.add(new_rider)
         db.commit()
         db.refresh(new_rider)
         
-        logger.info(f"Rider registered successfully with user {rider_data.user_id}")
+        logger.info(f"Rider registered successfully with user {rider_data.user_id}, public_id: {public_id}, status: pending")
         return new_rider   
     
     except HTTPException:

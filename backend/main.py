@@ -29,6 +29,7 @@ app.include_router(passanger.router)
 app.include_router(ws_routes.router)
 app.include_router(vehicles.router)
 
+
 logger.info("All routes registered successfully")
 
 

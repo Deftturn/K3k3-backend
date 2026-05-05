@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from models.models import Admin, RoleType, User, Passenger, Rider
+from models.models import Admin, RoleType, User, Passenger, Rider, RiderApprovalStatus
 from schemas import user
 from utils.hashcode import hash_password, verify_password
+from utils.id_generator import generate_id
 import logging
 from typing import List
 from datetime import datetime
@@ -26,12 +27,26 @@ def create_passenger_for_user(db: Session, user_id: int, gender: str, created_at
         raise HTTPException(status_code=500, detail="Failed to create passenger profile")
 
 def create_rider_for_user(db: Session, user_id: int, gender: str, is_available: bool, created_at: datetime=None, updated_at: datetime=None) -> Rider: #type:ignore
-    """Helper function to create a rider record for a new user."""
+    """Helper function to create a rider record for a new user.
+    
+    The rider is created with pending approval status and a generated public_id.
+    Admin approval is required before the rider can become active.
+    """
     try:
-        new_rider = Rider(user_id=user_id, gender=gender, is_available=is_available)
+        rider_id = generate_id("K3R")
+        public_id = generate_id("K3R")
+        new_rider = Rider(
+            user_id=user_id,
+            rider_id=rider_id,
+            public_id=public_id,
+            approval_status=RiderApprovalStatus.pending,
+            gender=gender,
+            is_available=is_available
+        )
         db.add(new_rider)
         db.commit()
         db.refresh(new_rider)
+        logger.info(f"Rider created for user {user_id} with public_id: {public_id}, status: pending")
         return new_rider
     except Exception as e:
         logger.error(f"Failed to create rider for user {user_id}: {e}")
@@ -72,7 +87,8 @@ def create_user(user_data: user.UserCreate, db: Session = Depends(get_db)):
         
         # Create user
         new_user = User(
-            name=user_data.name,
+            fname=user_data.fname,
+            lname=user_data.lname,
             email=user_data.email,
             phone=user_data.phone,
             password=hashed_pw,
